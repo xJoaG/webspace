@@ -4,7 +4,7 @@ import { Mail, CheckCircle, RotateCcw, X, Loader, AlertCircle } from 'lucide-rea
 import { useAuth } from '../context/AuthContext';
 
 const VerifyEmailModal: React.FC = () => {
-  const { user, resendVerificationEmail, setShowVerificationPopup, isLoading: authLoading } = useAuth();
+    const { user, resendVerificationEmail, setShowVerificationPopup, isLoading: authLoading, logout } = useAuth();
   const [countdown, setCountdown] = useState(0); // Initialize to 0, so it's clickable initially
   const [isCooldownActive, setIsCooldownActive] = useState(false); // New state to manage cooldown
   const [resendMessage, setResendMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -84,6 +84,14 @@ const VerifyEmailModal: React.FC = () => {
           <h1 className="text-2xl font-bold text-white mb-2">Verify Your Email</h1>
           <p className="text-gray-300">
             Your account is not yet verified. Please check your inbox and click the verification link sent to:
+                    
+                    {/* Logout button */}
+                    <button
+                        onClick={logout}
+                        className="w-full bg-red-500/20 backdrop-blur-sm text-red-400 py-3 rounded-lg font-semibold hover:bg-red-500/30 transition-all duration-200 border border-red-500/30 flex items-center justify-center space-x-2"
+                    >
+                        <span>Logout</span>
+                    </button>
           </p>
         </div>
 

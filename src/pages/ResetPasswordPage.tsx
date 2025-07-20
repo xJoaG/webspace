@@ -5,7 +5,7 @@ import { Lock, Eye, EyeOff, Loader, CheckCircle, AlertCircle, KeyRound } from 'l
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ParticleNetwork from '../components/ParticleNetwork';
-import { API_BASE_URL } from '../context/AuthContext'; // <--- IMPORTED API_BASE_URL
+import { API_BASE_URL } from '../context/AuthContext';
 
 const ResetPasswordPage: React.FC = () => {
     const { token } = useParams<{ token: string }>(); // Get the token from the URL
@@ -28,10 +28,9 @@ const ResetPasswordPage: React.FC = () => {
 
             try {
                 // Call backend to validate the token without consuming it
-                const response = await fetch(`${API_BASE_URL}/api/auth/reset-password/validate-token`, {
+                const response = await fetch(`${API_BASE_URL}/api/auth/validate-reset-token/${token}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token }),
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 const data = await response.json();

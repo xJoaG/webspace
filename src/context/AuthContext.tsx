@@ -47,6 +47,10 @@ interface AuthContextType {
   isBanned: () => boolean;
   showBanPopup: boolean;
   setShowBanPopup: React.Dispatch<React.SetStateAction<boolean>>;
+  // NEW: Profile update function
+  updateProfile: (profileData: any) => Promise<{ success: boolean; message?: string; user?: User }>;
+  // NEW: Fetch user profile function
+  fetchUserProfile: (userId: string) => Promise<{ success: boolean; user?: any; message?: string }>;
 }
 
 // Define the hierarchy of groups for frontend authorization
@@ -140,7 +144,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-
     const login = async (credentials: any): Promise<{ success: boolean; message?: string; errors?: string[] }> => {
         setIsLoading(true);
         try {
@@ -153,7 +156,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const data = await response.json();
 
             if (response.ok) {
-                setUserData(data, data.token);
+                setUserData(data.user, data.token);
                 return { success: true, message: data.message };
             } else {
                 return { success: false, message: data.message, errors: data.errors };
@@ -169,7 +172,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const register = async (data: any): Promise<{ success: boolean; message?: string; errors?: string[] }> => {
         setIsLoading(true);
         try {
-            // Removed the citation annotations that were causing the error
             const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -222,7 +224,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const requestPasswordResetCode = async (emailOrUsername: string): Promise<{ success: boolean; message?: string; }> => {
         setIsLoading(true);
         try {
-            // This endpoint needs to be implemented in your backend to send a code via email
             const response = await fetch(`${API_BASE_URL}/api/auth/request-password-reset-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -230,7 +231,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             });
 
             const data = await response.json();
-            // Backend sends a generic success message for security, even if user doesn't exist
             if (response.ok) {
                 return { success: true, message: data.message || 'If an account with that email or username exists, a password reset code has been sent.' };
             } else {
@@ -248,7 +248,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const verifyResetCode = async (emailOrUsername: string, code: string): Promise<{ success: boolean; message?: string; tempToken?: string }> => {
         setIsLoading(true);
         try {
-            // This endpoint needs to be implemented in your backend to verify the code
             const response = await fetch(`${API_BASE_URL}/api/auth/verify-reset-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -273,7 +272,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const resetPasswordWithCode = async (emailOrUsername: string, code: string, newPassword: string): Promise<{ success: boolean; message?: string; }> => {
         setIsLoading(true);
         try {
-            // This endpoint needs to be implemented in your backend to reset password with code
             const response = await fetch(`${API_BASE_URL}/api/auth/reset-password-with-code`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -294,6 +292,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    // NEW: Function to update user profile
+    const updateProfile = async (profileData: any): Promise<{ success: boolean; message?: string; user?: User }> => {
+        setIsLoading(true);
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                return { success: false, message: 'No authentication token found.' };
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(profileData),
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                // Update user data in context
+                setUserData(data.user, token);
+                return { success: true, message: data.message, user: data.user };
+            } else {
+                return { success: false, message: data.message || 'Failed to update profile.' };
+            }
+        } catch (error: any) {
+            console.error('Update profile error:', error);
+            return { success: false, message: error.message || 'Network error or server unavailable.' };
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // NEW: Function to fetch user profile by ID
+    const fetchUserProfile = async (userId: string): Promise<{ success: boolean; user?: any; message?: string }> => {
+        try {
+            const token = localStorage.getItem('token');
+            const headers: any = { 'Content-Type': 'application/json' };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+                method: 'GET',
+                headers,
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                return { success: true, user: data.user };
+            } else {
+                return { success: false, message: data.message || 'Failed to fetch user profile.' };
+            }
+        } catch (error: any) {
+            console.error('Fetch user profile error:', error);
+            return { success: false, message: error.message || 'Network error or server unavailable.' };
+        }
+    };
 
     // Function to update user data in context and local storage, potentially re-evaluating popups
     const updateUser = (newUserData: Partial<User>) => {
@@ -345,7 +403,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const savedToken = localStorage.getItem('token');
 
         const fetchUserData = async (token: string) => {
-            setIsLoading(true); // Ensure loading is true during the fetch
+            setIsLoading(true);
             try {
                 const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
                     method: 'GET',
@@ -357,16 +415,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
                 if (response.ok) {
                     const userData = await response.json();
-                    setUserData(userData, token);
+                    setUserData(userData.user, token);
                 } else {
                     console.error('Failed to fetch user data:', response.statusText);
-                    logout(); // This also sets user to null and isLoading to false
+                    logout();
                 }
             } catch (error) {
                 console.error('Network error fetching user data:', error);
-                logout(); // This also sets user to null and isLoading to false
+                logout();
             } finally {
-                setIsLoading(false); // Set to false when fetch completes (success or error)
+                setIsLoading(false);
             }
         };
 
@@ -380,13 +438,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             } catch (error) {
                 console.error('Error parsing saved user or token:', error);
                 logout();
-                setIsLoading(false); // If parsing fails, stop loading
+                setIsLoading(false);
             }
         } else {
-            // If no user or token in localStorage, we're not loading user data from backend
             setIsLoading(false);
         }
-    }, []); // Run once on component mount
+    }, []);
 
     const value = {
         user,
@@ -406,6 +463,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         showBanPopup,
         setShowBanPopup,
         hasPrivilege,
+        updateProfile,
+        fetchUserProfile,
     };
 
     return (

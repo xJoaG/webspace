@@ -4,7 +4,7 @@ import { User, Globe, Image, Lock, Loader, AlertCircle, Ban, MessageSquare, Mail
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ParticleNetwork from '../components/ParticleNetwork';
-import { useAuth, API_BASE_URL } from '../context/AuthContext'; // <--- IMPORTED API_BASE_URL
+import { useAuth, API_BASE_URL } from '../context/AuthContext';
 
 interface PublicProfileData {
     id: number;
@@ -22,53 +22,11 @@ interface PublicProfileData {
     message?: string;
 }
 
-const DEFAULT_PROFILE_PICTURE_URL = `${API_BASE_URL}/uploads/profile_pictures/default_profile.png`; // Uses imported API_BASE_URL
-
-// Mock profile data - NOTE: In a real app, this would come from a backend API call.
-// Adjust URLs here for mock data to reflect the new secure endpoint
-const MOCK_PROFILES: { [key: string]: PublicProfileData } = {
-    '1': {
-        id: 1,
-        username: 'johndoe_cpp',
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-        bio: 'Passionate C++ developer with 5 years of experience. Love solving complex problems and learning new technologies.',
-        nationality: 'United States',
-        profile_picture_url: `${API_BASE_URL}/api/profile-pictures/1-1752967339946.png`, // Example for secure endpoint
-        is_profile_public: true,
-        group: 'Premium Plan',
-        banned_until: null,
-        ban_reason: null,
-    },
-    '2': {
-        id: 2,
-        username: 'sarah_dev',
-        name: 'Sarah Wilson',
-        bio: 'Software engineer specializing in systems programming and performance optimization.',
-        nationality: 'Canada',
-        profile_picture_url: `${API_BASE_URL}/api/profile-pictures/2-timestamp.jpeg`, // Example for secure endpoint
-        is_profile_public: true,
-        group: 'Basic Plan',
-        banned_until: null,
-        ban_reason: null,
-    },
-    '3': {
-        id: 3,
-        username: 'mike_coder',
-        bio: null,
-        nationality: null,
-        profile_picture_url: null, // This will now show the DEFAULT_PROFILE_PICTURE_URL
-        is_profile_public: false,
-        group: 'Premium Plan',
-        banned_until: null,
-        ban_reason: null,
-        is_private: true, // This field is for mock data, not directly from backend user model
-    }
-};
+const DEFAULT_PROFILE_PICTURE_URL = `${API_BASE_URL}/uploads/profile_pictures/default_profile.png`;
 
 const PublicProfilePage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
-    const { user: currentUser, hasPrivilege } = useAuth();
+    const { user: currentUser, hasPrivilege, fetchUserProfile } = useAuth();
     const [profile, setProfile] = useState<PublicProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -81,44 +39,29 @@ const PublicProfilePage: React.FC = () => {
             setIsTargetUserBanned(false);
             
             try {
-                // In a real application, you would make an API call here:
-                // const response = await fetch(`${API_BASE_URL}/api/users/${id}`);
-                // const data = await response.json();
-                // const fetchedProfile = data.user;
-
-                // Simulate API call delay
-                await new Promise(resolve => setTimeout(resolve, 1000));
+                const result = await fetchUserProfile(id);
                 
-                if (id && MOCK_PROFILES[id]) {
-                    const mockProfile = { ...MOCK_PROFILES[id] }; // Create a copy to modify
-
-                    // Ensure profile_picture_url uses the secure endpoint if it's not null
-                    // and doesn't already start with http (meaning it's from mock or relative from backend)
-                    if (mockProfile.profile_picture_url && !mockProfile.profile_picture_url.startsWith('http')) {
-                        // Assuming the mock profile_picture_url is just the filename for this transformation
-                        mockProfile.profile_picture_url = `${API_BASE_URL}/api/profile-pictures/${mockProfile.profile_picture_url}`;
-                    }
-                    // If profile_picture_url is null or empty, it will fall back to DEFAULT_PROFILE_PICTURE_URL in JSX
-
+                if (result.success && result.user) {
+                    const fetchedProfile = result.user;
+                    
                     // Check if profile is private
-                    // is_profile_public is directly from backend. is_private is a mock property.
-                    if (!mockProfile.is_profile_public && (!currentUser || currentUser.id !== mockProfile.id)) {
+                    if (!fetchedProfile.is_profile_public && (!currentUser || currentUser.id !== fetchedProfile.id)) {
                         setError('This profile is private.');
                         setProfile(null);
                         return;
                     }
                     
                     // Check if user is banned
-                    if (mockProfile.banned_until) {
-                        const bannedUntilDate = new Date(mockProfile.banned_until);
+                    if (fetchedProfile.banned_until) {
+                        const bannedUntilDate = new Date(fetchedProfile.banned_until);
                         if (bannedUntilDate > new Date()) {
                             setIsTargetUserBanned(true);
                         }
                     }
                     
-                    setProfile(mockProfile);
+                    setProfile(fetchedProfile);
                 } else {
-                    setError('User not found.');
+                    setError(result.message || 'User not found.');
                     setProfile(null);
                 }
             } catch (err: any) {
@@ -132,7 +75,7 @@ const PublicProfilePage: React.FC = () => {
         if (id) {
             fetchProfile();
         }
-    }, [id, currentUser]); // Removed API_BASE_URL from dependencies since it's a constant
+    }, [id, currentUser, fetchUserProfile]);
 
     if (loading) {
         return (
